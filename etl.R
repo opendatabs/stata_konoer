@@ -97,7 +97,7 @@ data_bussen_new <- data_bussen %>%
 print(head(data_bussen_new))
 write.csv(data_bussen_new,file = "data/data_Ordnungsbussen.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
-data_strassenverkehr <- get_daataset(urlStrassenverkehr, pw_file = "pw.txt")
+data_strassenverkehr <- get_dataset(urlStrassenverkehr, pw_file = "pw.txt")
 data_strassenverkehr_new <- data_strassenverkehr %>%
   rename(id = "id_unfall",
          incident_type_primary= "typ",
