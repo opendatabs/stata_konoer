@@ -1,8 +1,7 @@
 FROM rocker/rstudio:4.5.1
 # Base image with R 4.2.1 and RStudio
 
-WORKDIR /code/data-processing/stata_konoer
-
+WORKDIR /code
 # Install required system dependencies
 RUN apt-get update && apt-get install -y \
     sudo \
@@ -36,5 +35,7 @@ RUN echo "r <- getOption('repos'); \
 # Install required R packages
 RUN Rscript -e "install.packages(c('zoo', 'data.table', 'lubridate', 'knitr', 'tidyverse', 'eRTG3D', 'httr'), dependencies = TRUE)"
 
+COPY . /code/
+
 # Set the default command to execute the R script
-CMD ["Rscript", "/code/data-processing/stata_konoer/etl.R"]
+CMD ["Rscript", "etl.R"]

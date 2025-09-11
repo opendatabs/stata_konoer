@@ -6,7 +6,7 @@ library(httr)
 
 get_dataset <- function(url, pw_file = NULL, output_file = "100120.csv") {
   # Create directory if it does not exist
-  data_path <- file.path('code', 'data-processing', 'stata_konoer', 'data')
+  data_path <- file.path('data_orig')
   if (!dir.exists(data_path)) {
     dir.create(data_path, recursive = TRUE)
   }
@@ -55,10 +55,10 @@ get_dataset <- function(url, pw_file = NULL, output_file = "100120.csv") {
 }
 
 
-pathBussen <- "/code/data-processing/kapo_ordnungsbussen/data/Ordnungsbussen_OGD_all.csv"
-pathWildeDeponien <- "/code/data-processing/stadtreinigung_wildedeponien/data/wildedeponien_all.csv"
+pathBussen <- "data_orig/ordnungsbussen/Ordnungsbussen_OGD_all.csv"
+pathWildeDeponien <- "data_orig/wildedeponien/wildedeponien_all.csv"
 urlStrassenverkehr <- "https://data.bs.ch/explore/dataset/100120/download?format=csv&timezone=Europe%2FZurich"
-pathSprayereien <- "/code/data-processing/tba_sprayereien/data/sprayereien.csv"
+pathSprayereien <- "data_orig/sprayereien/sprayereien.csv"
 
 data_deponien <- fread(pathWildeDeponien, header = TRUE)
 data_deponien_new <- data_deponien %>%
@@ -90,7 +90,7 @@ data_deponien_new <- data_deponien %>%
 #   rownames_to_column(var = "id")
 # data_deponien_new <- data_deponien_new %>% left_join(transformationLonLat %>% select(id, longitude=x , latitude=y), by= join_by(id==id))
 # 
-write.csv(data_deponien_new,file = "/code/data-processing/stata_konoer/data/data_wildeDeponien.csv", fileEncoding = "UTF-8", row.names = FALSE)
+write.csv(data_deponien_new,file = "data/data_wildeDeponien.csv", fileEncoding = "UTF-8", row.names = FALSE)
  
 #Ordnungsbussen select = c(1,5,6,7,12,19,20)
 data_bussen <-fread(pathBussen, header = TRUE)
@@ -112,9 +112,9 @@ data_bussen_new <- data_bussen %>%
   filter(!is.na(longitude)) %>%
   filter(!is.na(latitude))
 print(head(data_bussen_new))
-write.csv(data_bussen_new,file = "/code/data-processing/stata_konoer/data/data_Ordnungsbussen.csv", fileEncoding = "UTF-8", row.names = FALSE)
+write.csv(data_bussen_new,file = "data/data_Ordnungsbussen.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
-data_strassenverkehr <- get_dataset(urlStrassenverkehr, pw_file = "pw.txt")
+data_strassenverkehr <- get_daataset(urlStrassenverkehr, pw_file = "pw.txt")
 data_strassenverkehr_new <- data_strassenverkehr %>%
   rename(id = "id_unfall",
          incident_type_primary= "typ",
@@ -136,10 +136,10 @@ data_strassenverkehr_new <- data_strassenverkehr %>%
   separate_wider_delim(col="x", delim = ",", names = c("incident_type_secondary_nr","incident_type_secondary")) %>% 
   select(id,incident_date,year,month,day_of_week_nr, day_of_week,hour_of_day,longitude,latitude,parent_incident_type, incident_type_primary,incident_type_secondary_nr,incident_type_secondary)
 
-write.csv(data_strassenverkehr_new,file = "/code/data-processing/stata_konoer/data/data_strassenverkehr.csv", fileEncoding = "UTF-8", row.names = FALSE)
+write.csv(data_strassenverkehr_new,file = "data/data_strassenverkehr.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
 write.csv(data_strassenverkehr_new %>% select(parent_incident_type,incident_type_primary,incident_type_secondary_nr,incident_type_secondary) %>% unique(),
-          file = "/code/data-processing/stata_konoer/data/data_strassenverkehrziffern.csv", fileEncoding = "UTF-8", row.names = FALSE)
+          file = "data/data_strassenverkehrziffern.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
 
 spray <- read.csv(pathSprayereien)
@@ -192,7 +192,7 @@ spray <- spray %>%
 spray <- dplyr::select(spray, id, incident_date, year, month, day_of_week_nr, day_of_week, hour_of_day, longitude, latitude, parent_incident_type, incident_type_primary)
 
 # Pfad zur CSV-Datei
-output_file <- "/code/data-processing/stata_konoer/data/data_sprayereien.csv"
+output_file <- "data/data_sprayereien.csv"
 
 # Exportieren des DataFrames als CSV-Datei
 write.csv(spray, file = output_file, row.names = FALSE)
@@ -201,4 +201,4 @@ write.csv(spray, file = output_file, row.names = FALSE)
 urlMetadata <- "https://data.bs.ch/explore/dataset/100057/download/?format=csv&timezone=Europe/Zurich&use_labels=true"
 metadata <- get_dataset(urlMetadata, pw_file = "pw.txt", output_file = "100057.csv")
 # TODO: Check if some processing is necessary
-write.csv(metadata, file = "/code/data-processing/stata_konoer/data/data_metadata.csv", row.names = FALSE)
+write.csv(metadata, file = "data/data_metadata.csv", row.names = FALSE)
