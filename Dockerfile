@@ -1,5 +1,4 @@
 FROM rocker/rstudio:4.5.1
-# Base image with R 4.2.1 and RStudio
 
 WORKDIR /code
 # Install required system dependencies
@@ -29,11 +28,10 @@ ENV LC_ALL=de_DE.UTF-8
 
 # Set default RStudio Package Manager Repository
 RUN echo "r <- getOption('repos'); \
-          r['CRAN'] <- 'https://packagemanager.rstudio.com/cran/__linux__/focal/2024-11-28'; \
-          options(repos = r);" > ~/.Rprofile
+          r['CRAN'] <- 'https://packagemanager.rstudio.com/cran/__linux__/jammy/2024-11-28'; \
+          options(repos = r);" > ~/.Rprofile-
 
-# Install required R packages
-RUN Rscript -e "install.packages(c('zoo', 'data.table', 'lubridate', 'knitr', 'tidyverse', 'eRTG3D', 'httr'), dependencies = TRUE)"
+RUN Rscript -e "install.packages(c('zoo','data.table','lubridate','knitr','tidyverse','eRTG3D','httr'), dependencies=TRUE)"
 
 COPY . /code/
 
