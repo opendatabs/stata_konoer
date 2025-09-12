@@ -26,6 +26,8 @@ RUN if [ -n "$RENKU_VERSION" ] ; then \
 FROM renku/renkulab-r:4.3.1-0.25.0
 
 WORKDIR /code
+
+USER root
 # Install required system dependencies
 RUN apt-get update && apt-get install -y \
     sudo \
