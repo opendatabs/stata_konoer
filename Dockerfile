@@ -29,8 +29,7 @@ ENV LC_ALL=de_DE.UTF-8
 # Set default RStudio Package Manager Repository
 RUN echo "r <- getOption('repos'); \
           r['CRAN'] <- 'https://packagemanager.rstudio.com/cran/__linux__/jammy/2024-11-28'; \
-          options(repos = r);" > ~/.Rprofile
-
+          options(repos = r);" > ~/.Rprofile-
 
 COPY install.R /code/
 RUN R -f /code/install.R
