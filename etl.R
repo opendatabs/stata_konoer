@@ -4,7 +4,7 @@ library(lubridate)
 library(tidyverse)
 library(httr)
 
-get_dataset <- function(url, pw_file = NULL, output_file = "100120.csv") {
+get_dataset <- function(url, output_file = "100120.csv") {
   # Create directory if it does not exist
   data_path <- file.path('data_orig')
   if (!dir.exists(data_path)) {
@@ -97,33 +97,71 @@ data_bussen_new <- data_bussen %>%
 print(head(data_bussen_new))
 write.csv(data_bussen_new,file = "data/data_Ordnungsbussen.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
-data_strassenverkehr <- get_dataset(urlStrassenverkehr, pw_file = "pw.txt")
+data_strassenverkehr <- get_dataset(urlStrassenverkehr)
+nm <- names(data_strassenverkehr)
+# Map both schemas to the same working names used downstream
+if ("id_unfall" %in% nm) {
+  map <- list(
+    id = "id_unfall",
+    incident_type_primary = "typ",
+    x_temp = "schwere",
+    year = "jahr",
+    month = "monat",
+    hour_of_day = "stunde"
+  )
+  wday_col <- "wochentag"
+} else {
+  map <- list(
+    id = "gml_id",
+    incident_type_primary = "vu_typ",
+    x_temp = "vu_schwerekategorie",
+    year = "vu_jahr",
+    month = "vu_monat",
+    hour_of_day = "vu_stunde"
+  )
+  wday_col <- "vu_wochentag"
+}
+
 data_strassenverkehr_new <- data_strassenverkehr %>%
-  rename(id = "id_unfall",
-         incident_type_primary= "typ",
-         year= "jahr",
-         x_temp = "schwere",
-         month = "monat",
-         hour_of_day = "stunde") %>%
-  separate_wider_delim(col="geo_point_2d", delim = ",", names = c("latitude","longitude")) %>%
-  separate_wider_delim(col="wochentag", delim = " ", names = c("day_of_week_nr","day_of_week")) %>%
-  mutate(parent_incident_type = "Verkehrsunfälle",
-         longitude = as.numeric(longitude),
-         latitude = as.numeric(latitude),
-         incident_date = lubridate::ymd(paste(year,month,"1", sep = "-"))) %>% 
+  dplyr::rename(!!!map) %>%
+  # lat/lon from geo_point_2d remain the same
+  tidyr::separate_wider_delim(col = "geo_point_2d", delim = ",",
+                              names = c("latitude","longitude")) %>%
+  tidyr::separate_wider_delim(col = all_of(wday_col), delim = " ",
+                              names = c("day_of_week_nr","day_of_week")) %>%
+  dplyr::mutate(
+    parent_incident_type = "Verkehrsunfälle",
+    longitude = as.numeric(longitude),
+    latitude  = as.numeric(latitude),
+    incident_date = lubridate::ymd(paste(year, month, "1", sep = "-"))
+  ) %>%
   rowwise() %>%
-  mutate(x = pmap(.l = list(x_temp),.f = function(...){
-          temp <-  stringr::str_split(x_temp, pattern = " ", n = 2)
-    return(paste(temp[[1]][1], temp[[1]][2], sep = ","))
-    })) %>% 
-  separate_wider_delim(col="x", delim = ",", names = c("incident_type_secondary_nr","incident_type_secondary")) %>% 
-  select(id,incident_date,year,month,day_of_week_nr, day_of_week,hour_of_day,longitude,latitude,parent_incident_type, incident_type_primary,incident_type_secondary_nr,incident_type_secondary)
+  mutate(x = {
+    tmp <- stringr::str_split(x_temp, pattern = " ", n = 2)[[1]]
+    paste(tmp[1], tmp[2], sep = ",")
+  }) %>%
+  ungroup() %>%
+  tidyr::separate_wider_delim(col = "x", delim = ",",
+                              names = c("incident_type_secondary_nr","incident_type_secondary")) %>%
+  dplyr::select(
+    id, incident_date, year, month,
+    day_of_week_nr, day_of_week, hour_of_day,
+    longitude, latitude,
+    parent_incident_type, incident_type_primary,
+    incident_type_secondary_nr, incident_type_secondary
+  )
 
-write.csv(data_strassenverkehr_new,file = "data/data_strassenverkehr.csv", fileEncoding = "UTF-8", row.names = FALSE)
+write.csv(data_strassenverkehr_new, file = "data/data_strassenverkehr.csv",
+          fileEncoding = "UTF-8", row.names = FALSE)
 
-write.csv(data_strassenverkehr_new %>% select(parent_incident_type,incident_type_primary,incident_type_secondary_nr,incident_type_secondary) %>% unique(),
-          file = "data/data_strassenverkehrziffern.csv", fileEncoding = "UTF-8", row.names = FALSE)
-
+write.csv(
+  data_strassenverkehr_new %>%
+    dplyr::select(parent_incident_type, incident_type_primary,
+                  incident_type_secondary_nr, incident_type_secondary) %>%
+    dplyr::distinct(),
+  file = "data/data_strassenverkehrziffern.csv",
+  fileEncoding = "UTF-8", row.names = FALSE
+)
 
 spray <- read.csv(pathSprayereien)
 
@@ -182,6 +220,6 @@ write.csv(spray, file = output_file, row.names = FALSE)
 
 # Last but not least, get the Metadata
 urlMetadata <- "https://data.bs.ch/explore/dataset/100057/download/?format=csv&timezone=Europe/Zurich&use_labels=true"
-metadata <- get_dataset(urlMetadata, pw_file = "pw.txt", output_file = "100057.csv")
+metadata <- get_dataset(urlMetadata, output_file = "100057.csv")
 # TODO: Check if some processing is necessary
 write.csv(metadata, file = "data/data_metadata.csv", row.names = FALSE)
