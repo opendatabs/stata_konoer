@@ -42,7 +42,10 @@ pathBussen <- "data_orig/ordnungsbussen/Ordnungsbussen_OGD_all.csv"
 pathWildeDeponien <- "data_orig/wildedeponien/wildedeponien_all.csv"
 urlStrassenverkehr <- "https://data.bs.ch/explore/dataset/100120/download?format=csv&timezone=Europe%2FZurich"
 pathSprayereien <- "data_orig/sprayereien/sprayereien.csv"
+pathRequisition <- "data_orig/requisitionen/Requisitionen.csv"
+pathAllmendbewilligungen <- "data_orig/allmend/sbt_allmend_centroids.csv"
 
+# ----------------- Wilde Deponien -----------------
 data_deponien <- fread(pathWildeDeponien, header = TRUE)
 data_deponien_new <- data_deponien %>%
   select(-id) %>%
@@ -74,7 +77,8 @@ data_deponien_new <- data_deponien %>%
 # data_deponien_new <- data_deponien_new %>% left_join(transformationLonLat %>% select(id, longitude=x , latitude=y), by= join_by(id==id))
 # 
 write.csv(data_deponien_new,file = "data/data_wildeDeponien.csv", fileEncoding = "UTF-8", row.names = FALSE)
- 
+
+# ----------------- Ordnungsbussen -----------------
 #Ordnungsbussen select = c(1,5,6,7,12,19,20)
 data_bussen <-fread(pathBussen, header = TRUE)
 data_bussen_new <- data_bussen %>%
@@ -97,6 +101,7 @@ data_bussen_new <- data_bussen %>%
 print(head(data_bussen_new))
 write.csv(data_bussen_new,file = "data/data_Ordnungsbussen.csv", fileEncoding = "UTF-8", row.names = FALSE)
 
+# ----------------- Strassenverkehr -----------------
 data_strassenverkehr <- get_dataset(urlStrassenverkehr)
 nm <- names(data_strassenverkehr)
 # Map both schemas to the same working names used downstream
@@ -163,6 +168,62 @@ write.csv(
   fileEncoding = "UTF-8", row.names = FALSE
 )
 
+# ----------------- Requisitionen -----------------
+data_requis <- fread(pathRequisition, header = TRUE, encoding = "Latin-1")
+data_requis_new <- data_requis %>%
+  rename(id = EINSAETZE_KEY, 
+         year = EinsatzJahr, 
+         month = EinsatzMonat, incident_date = EinsatzDatum, incident_type_primary =EreignistypKlasse , incident_type_secondary = Ereignistyp) %>%
+  mutate(parent_incident_type = "Requisitionen", 
+         ort_strasse_name = case_when(
+           ort_strasse_name == "St.Johanns-Ring" ~ "St. Johanns-Ring",
+           ort_strasse_name =="Mittlere Strasse" ~ "Mittlere Str.",
+          TRUE ~ ort_strasse_name),
+         day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE), 
+         hour_of_day = lubridate::hour(lubridate::parse_date_time(Einsatzzeit, orders = c("HM","HMS")))) %>% 
+  left_join(data_eingang_new, by = join_by(ort_gemeinde_name == plz_ort_name, ort_strasse_name == strasse_text, ort_Hausnummer == eingang_hausnummer)) %>%
+  mutate(OriginalKoordinateX = ifelse(OriginalKoordinateX == 2000000 & !is.na(gebaeude_koordinate_x), gebaeude_koordinate_x, OriginalKoordinateX),
+         OriginalKoordinateY = ifelse(OriginalKoordinateY == 1000000 & !is.na(gebaeude_koordinate_y), gebaeude_koordinate_y, OriginalKoordinateY))%>%
+  filter(!is.na(OriginalKoordinateX) | !is.na(OriginalKoordinateY)) %>%
+  mutate(x = pmap(.l = list(OriginalKoordinateX,OriginalKoordinateY),.f = function(OriginalKoordinateX,OriginalKoordinateY,...){
+    eRTG3D::transformCRS.3d(data.frame(x = OriginalKoordinateX, y = OriginalKoordinateY, z = 260), fromCRS=2056, toCRS=4326)
+  }))%>% 
+  unnest(x) %>%
+  rename(longitude = x, latitude =y)
+
+data_requis_export <- data_requis_new %>% filter(OriginalKoordinateX != 2000000)
+
+write.csv(data_requis_export %>%
+            select(id,incident_date,year, month,day_of_week,hour_of_day,longitude,latitude,parent_incident_type,incident_type_primary,incident_type_secondary),
+          file = "data/data_requisitionen.csv", fileEncoding = "UTF-8", row.names = FALSE)
+
+
+# ----------------- Allmend -----------------
+data_allmend <- fread(pathAllmendbewilligungen, header = TRUE)
+head(data_allmend)
+data_allmend_export <- data_allmend %>%
+  select(latitude = centroid_y, longitude = centroid_x,BegehrenID, incident_type_secondary= Bezeichnung, incident_type_primary = "Entscheid-Bezeichnung",  incident_date = Datum_von, incident_date_to = Datum_bis) %>%
+  mutate(
+    parent_incident_type =  "Allmend",
+    year = lubridate::year(incident_date),
+    year_to = lubridate::year(incident_date_to),
+    month = lubridate::month(incident_date),
+    month_to = lubridate::month(incident_date_to),
+    day_of_week_nr = lubridate::wday(incident_date),
+    day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE), 
+    day_of_week_nr_to = lubridate::wday(incident_date_to),
+    day_of_week_to = lubridate::wday(incident_date_to, label = TRUE, abbr = FALSE), 
+    hour_of_day = NA,
+    incident_type_primary = ifelse(incident_type_primary %in% c("", "<unbekannt>"), "unbekannt", incident_type_primary),
+    ) %>%
+  select(incident_date,year,month,BegehrenID,day_of_week_nr, day_of_week,hour_of_day,incident_date_to, year_to, month_to,day_of_week_nr_to,day_of_week_to,longitude,latitude,parent_incident_type, incident_type_primary,incident_type_secondary) %>% 
+  arrange(incident_type_primary)
+data_allmend_export$id <- seq(nrow(data_allmend_export))
+
+write.csv(data_allmend_export,
+          file = "data/data_allmend.csv", fileEncoding = "UTF-8", row.names = FALSE)
+
+# ----------------- Sprayereien -----------------
 spray <- read.csv(pathSprayereien)
 
 spray$date <- spray$erfassungszeit
@@ -218,6 +279,7 @@ output_file <- "data/data_sprayereien.csv"
 # Exportieren des DataFrames als CSV-Datei
 write.csv(spray, file = output_file, row.names = FALSE)
 
+# ----------------- Metadaten -----------------
 # Last but not least, get the Metadata
 urlMetadata <- "https://data.bs.ch/explore/dataset/100057/download/?format=csv&timezone=Europe/Zurich&use_labels=true"
 metadata <- get_dataset(urlMetadata, output_file = "100057.csv")
