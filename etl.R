@@ -169,33 +169,51 @@ write.csv(
 )
 
 # ----------------- Requisitionen -----------------
+# ----------------- Requisitionen -----------------
 data_requis <- fread(pathRequisition, header = TRUE, encoding = "Latin-1")
+
 data_requis_new <- data_requis %>%
-  rename(id = EINSAETZE_KEY, 
-         year = EinsatzJahr, 
-         month = EinsatzMonat, incident_date = EinsatzDatum, incident_type_primary =EreignistypKlasse , incident_type_secondary = Ereignistyp) %>%
-  mutate(parent_incident_type = "Requisitionen", 
-         ort_strasse_name = case_when(
-           ort_strasse_name == "St.Johanns-Ring" ~ "St. Johanns-Ring",
-           ort_strasse_name =="Mittlere Strasse" ~ "Mittlere Str.",
-          TRUE ~ ort_strasse_name),
-         day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE), 
-         hour_of_day = lubridate::hour(lubridate::parse_date_time(Einsatzzeit, orders = c("HM","HMS")))) %>% 
-  left_join(data_eingang_new, by = join_by(ort_gemeinde_name == plz_ort_name, ort_strasse_name == strasse_text, ort_Hausnummer == eingang_hausnummer)) %>%
-  mutate(OriginalKoordinateX = ifelse(OriginalKoordinateX == 2000000 & !is.na(gebaeude_koordinate_x), gebaeude_koordinate_x, OriginalKoordinateX),
-         OriginalKoordinateY = ifelse(OriginalKoordinateY == 1000000 & !is.na(gebaeude_koordinate_y), gebaeude_koordinate_y, OriginalKoordinateY))%>%
-  filter(!is.na(OriginalKoordinateX) | !is.na(OriginalKoordinateY)) %>%
-  mutate(x = pmap(.l = list(OriginalKoordinateX,OriginalKoordinateY),.f = function(OriginalKoordinateX,OriginalKoordinateY,...){
-    eRTG3D::transformCRS.3d(data.frame(x = OriginalKoordinateX, y = OriginalKoordinateY, z = 260), fromCRS=2056, toCRS=4326)
-  }))%>% 
-  unnest(x) %>%
-  rename(longitude = x, latitude =y)
+  rename(
+    id = EINSAETZE_KEY,
+    incident_type_primary   = EreignistypKlasse,
+    incident_type_secondary = Ereignistyp
+  ) %>%
+  mutate(
+    parent_incident_type = "Requisitionen",
+
+    # Einsatzdatum_key is YYYYMMDD (numeric or character)
+    incident_date = as.Date(as.character(Einsatzdatum_key), format = "%Y%m%d"),
+    year  = lubridate::year(incident_date),
+    month = lubridate::month(incident_date),
+
+    day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE),
+    day_of_week_nr = lubridate::wday(incident_date),
+
+    # Parse times like "HM" or "HMS"
+    hour_of_day = lubridate::hour(lubridate::parse_date_time(Einsatzzeit, orders = c("HMS", "HM")))
+  ) %>%
+  filter(!is.na(OriginalKoordinateX) & !is.na(OriginalKoordinateY)) %>%
+  mutate(
+    x = purrr::pmap(
+      .l = list(OriginalKoordinateX, OriginalKoordinateY),
+      .f = function(x, y, ...) {
+        eRTG3D::transformCRS.3d(data.frame(x = x, y = y, z = 260), fromCRS = 2056, toCRS = 4326)
+      }
+    )
+  ) %>%
+  tidyr::unnest(x) %>%
+  rename(longitude = x, latitude = y)
 
 data_requis_export <- data_requis_new %>% filter(OriginalKoordinateX != 2000000)
 
-write.csv(data_requis_export %>%
-            select(id,incident_date,year, month,day_of_week,hour_of_day,longitude,latitude,parent_incident_type,incident_type_primary,incident_type_secondary),
-          file = "data/data_requisitionen.csv", fileEncoding = "UTF-8", row.names = FALSE)
+write.csv(
+  data_requis_export %>%
+    select(id, incident_date, year, month, day_of_week_nr, day_of_week, hour_of_day,
+           longitude, latitude, parent_incident_type, incident_type_primary, incident_type_secondary),
+  file = "data/data_requisitionen.csv",
+  fileEncoding = "UTF-8",
+  row.names = FALSE
+)
 
 
 # ----------------- Allmend -----------------
