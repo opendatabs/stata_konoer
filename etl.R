@@ -169,7 +169,6 @@ write.csv(
 )
 
 # ----------------- Requisitionen -----------------
-# ----------------- Requisitionen -----------------
 data_requis <- fread(pathRequisition, header = TRUE, encoding = "Latin-1")
 
 data_requis_new <- data_requis %>%
