@@ -43,6 +43,7 @@ pathWildeDeponien <- "data_orig/wildedeponien/wildedeponien_all.csv"
 urlStrassenverkehr <- "https://data.bs.ch/explore/dataset/100120/download?format=csv&timezone=Europe%2FZurich"
 pathSprayereien <- "data_orig/sprayereien/sprayereien.csv"
 pathRequisition <- "data_orig/requisitionen/Requisitionen.csv"
+pathEingaenge <- "data_orig/requisitionen/Eingaenge.csv"
 pathAllmendbewilligungen <- "data_orig/allmend/sbt_allmend_centroids.csv"
 
 # ----------------- Wilde Deponien -----------------
@@ -169,7 +170,8 @@ write.csv(
 )
 
 # ----------------- Requisitionen -----------------
-data_requis <- fread(pathRequisition, header = TRUE, encoding = "Latin-1")
+data_eingang_new <- fread(pathEingaenge, header = TRUE, encoding = "UTF-8")
+data_requis <- fread(pathRequisition, header = TRUE, encoding = "UTF-8")
 data_requis_new <- data_requis %>%
   rename(id = EINSAETZE_KEY, 
          year = EinsatzJahr, 
