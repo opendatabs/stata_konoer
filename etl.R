@@ -170,21 +170,20 @@ write.csv(
 
 # ----------------- Requisitionen -----------------
 data_requis <- fread(pathRequisition, header = TRUE, encoding = "Latin-1")
-
 data_requis_new <- data_requis %>%
-  rename(
-    id                    = EINSAETZE_KEY,
-    incident_type_primary = EreignistypKlasse,
-    incident_type_secondary = Ereignistyp
-  ) %>%
-  mutate(
-    parent_incident_type = "Requisitionen",
-    incident_date = as.Date(as.character(Einsatzdatum_key), format = "%Y%m%d"),
-    year  = lubridate::year(incident_date),
-    month = lubridate::month(incident_date),
-    day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE),
-    hour_of_day = lubridate::hour(lubridate::parse_date_time(Einsatzzeit, orders = c("HM", "HMS")))
-  ) %>%
+  rename(id = EINSAETZE_KEY, 
+         year = EinsatzJahr, 
+         month = EinsatzMonat, incident_date = EinsatzDatum, incident_type_primary =EreignistypKlasse , incident_type_secondary = Ereignistyp) %>%
+  mutate(parent_incident_type = "Requisitionen", 
+         ort_strasse_name = case_when(
+           ort_strasse_name == "St.Johanns-Ring" ~ "St. Johanns-Ring",
+           ort_strasse_name =="Mittlere Strasse" ~ "Mittlere Str.",
+          TRUE ~ ort_strasse_name),
+         day_of_week = lubridate::wday(incident_date, label = TRUE, abbr = FALSE), 
+         hour_of_day = lubridate::hour(lubridate::parse_date_time(Einsatzzeit, orders = c("HM","HMS")))) %>% 
+  left_join(data_eingang_new, by = join_by(ort_gemeinde_name == plz_ort_name, ort_strasse_name == strasse_text, ort_Hausnummer == eingang_hausnummer)) %>%
+  mutate(OriginalKoordinateX = ifelse(OriginalKoordinateX == 2000000 & !is.na(gebaeude_koordinate_x), gebaeude_koordinate_x, OriginalKoordinateX),
+         OriginalKoordinateY = ifelse(OriginalKoordinateY == 1000000 & !is.na(gebaeude_koordinate_y), gebaeude_koordinate_y, OriginalKoordinateY))%>%
   filter(!is.na(OriginalKoordinateX) | !is.na(OriginalKoordinateY)) %>%
   mutate(x = pmap(.l = list(OriginalKoordinateX,OriginalKoordinateY),.f = function(OriginalKoordinateX,OriginalKoordinateY,...){
     eRTG3D::transformCRS.3d(data.frame(x = OriginalKoordinateX, y = OriginalKoordinateY, z = 260), fromCRS=2056, toCRS=4326)
