@@ -1,4 +1,4 @@
-FROM rocker/rstudio:4.5.1
+FROM rocker/rstudio:4.6.1
 
 WORKDIR /code
 # Install required system dependencies
